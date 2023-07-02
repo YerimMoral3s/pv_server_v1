@@ -1,0 +1,59 @@
+CREATE TABLE inventary(
+	id INT NOT NULL AUTO_INCREMENT,
+    id_shop INT NOT NULL,
+	id_product INT NOT NULL, 
+    price INT NULL,
+    quantity INT NULL,
+    PRIMARY KEY (id),
+    FOREIGN KEY(id_shop) REFERENCES shops(id),
+	FOREIGN KEY(id_shop) REFERENCES products(id)
+)
+
+CREATE TABLE transactions(
+	id INT NOT NULL AUTO_INCREMENT,
+    id_payment_type INT NOT NULL,
+	id_Inventory INT NOT NULL, 
+    quantity_sold INT NULL,
+    PRIMARY KEY (id),
+    FOREIGN KEY(id_payment_type) REFERENCES payment_types(id),
+	FOREIGN KEY(id_Inventory) REFERENCES inventary(id)
+)
+
+CREATE TABLE shops_transactions(
+	id INT NOT NULL AUTO_INCREMENT,
+    Id_shop INT NOT NULL,
+	Id_transaction INT NOT NULL, 
+    PRIMARY KEY (id),
+    FOREIGN KEY(Id_shop) REFERENCES shops(id),
+	FOREIGN KEY(Id_transaction) REFERENCES transactions(id)
+)
+
+CREATE TABLE Payment_types_Shops(
+	id INT NOT NULL AUTO_INCREMENT,
+    Id_shop INT NOT NULL,
+	id_payment_type INT NOT NULL, 
+    PRIMARY KEY (id),
+    FOREIGN KEY(Id_shop) REFERENCES shops(id),
+	FOREIGN KEY(id_payment_type) REFERENCES payment_types(id)
+)
+
+CREATE TABLE shops_employees (
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  id_user INT NOT NULL,
+  id_shop INT NOT NULL,
+  FOREIGN KEY (id_user) REFERENCES users(id),
+  FOREIGN KEY (id_shop) REFERENCES shops(id)
+);
+
+ALTER TABLE shops ADD COLUMN 
+	id_user INT NOT NULL 
+	AFTER logo, 
+    ADD CONSTRAINT fk_user_id FOREIGN KEY (id_user) REFERENCES users(id);
+
+
+ALTER TABLE shops 
+	ADD COLUMN id_shops_employees INT NOT NULL 
+    AFTER id_user, 
+    ADD CONSTRAINT fk_id_shops_employees
+    FOREIGN KEY (id_shops_employees) 
+    REFERENCES shops_employees(id);

@@ -1,0 +1,13 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.authRouter = void 0;
+const express_1 = __importDefault(require("express"));
+const controllers_1 = require("./controllers");
+exports.authRouter = express_1.default.Router();
+exports.authRouter.get('/test', controllers_1.authenticationToken, controllers_1.test);
+exports.authRouter.get('/refresh-token', controllers_1.authenticationToken, controllers_1.refreshToken);
+exports.authRouter.get('/', controllers_1.login);
+exports.authRouter.post('/', controllers_1.signIn);
