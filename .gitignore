@@ -1,0 +1,30 @@
+# Carpeta de dependencias (por defecto, node_modules/)
+node_modules/
+
+# Archivo de configuración de npm
+package-lock.json
+
+# Carpeta de compilación
+/dist/
+
+# Archivos de log
+*.log
+
+# Archivos de respaldo
+*.bak
+
+# Archivos de configuración local (pueden variar según tus necesidades)
+.env
+.env.local
+.env.*.local
+
+# Directorio de archivos estáticos generados dinámicamente
+/public/uploads/
+
+# Archivo de configuración para entorno de desarrollo local
+.env.development.local
+
+# Archivo de configuración para entorno de producción
+.env.production
+
+# Otros archivos o carpetas que desees ignorar
