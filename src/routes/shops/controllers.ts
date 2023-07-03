@@ -1,12 +1,14 @@
 import { Request, Response} from 'express';
 import { pool } from "../../db";
 import { TShop } from './types';
+import { IGetUserAuthInfoRequestWithBody } from '../auth';
 
-export const postUserShop = async (req: Request<TShop>, res: Response) => {
+export const postUserShop =  async (req: IGetUserAuthInfoRequestWithBody<{}>, res: Response) => {
   const {params} = req
   const {name, logo} = params
 
 
+  const [result] = await pool.query(`INSERT INTO shops (name, logo) VALUES ('${name}', '${logo}')`);
 
 
 
