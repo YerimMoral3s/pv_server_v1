@@ -63,9 +63,9 @@ export const signIn = async (req: Request<{},{},TUserAuth>, res: Response) => {
     return res.status(422).json({ error: 'Invalid email address' });
   }
 
-  // if (!validatePassword(password)) {
-  //   return res.status(400).json({ message: 'The password does not meet the security criteria.' });
-  // }
+  if (!validatePassword(password)) {
+    return res.status(400).json({ message: 'The password does not meet the security criteria.' });
+  }
 
   const emailExist = await findUserByEmail(email);
   if (emailExist) {
