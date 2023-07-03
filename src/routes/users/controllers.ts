@@ -4,7 +4,8 @@ import { pool } from "../../db";
 
 
 export const register = async (req: Request, res: Response) => {
-  
+  res.send('HELLO WORLD');
+
 }
 
 

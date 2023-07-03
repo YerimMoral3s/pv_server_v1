@@ -1,5 +1,5 @@
 import express, {Express, Request, Response} from 'express';
-import { authRouter } from './routes';
+import { authRouter, usersRouter } from './routes';
 
 
 const dotenv = require('dotenv');
@@ -18,7 +18,7 @@ app.get('/', (req: Request, res: Response) => {
 app.use(express.json())
 
 // app.use('/shops', authRouter);
-// app.use('/user', usersRouter);
+app.use('/user', usersRouter);
 app.use('/auth', authRouter);
 
 app.listen(mainPort, () => {

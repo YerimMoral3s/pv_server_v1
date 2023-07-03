@@ -4,7 +4,7 @@ import { register } from './controllers';
 
 export const usersRouter = express.Router();
 
-usersRouter.post('/:id', register);
+usersRouter.get('/', register);
 
 
  

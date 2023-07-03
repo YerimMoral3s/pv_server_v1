@@ -1,8 +1,9 @@
 import { Request, Response} from 'express';
 import { pool } from "../../db";
 import { IGetUserAuthInfoRequest, IGetUserAuthInfoRequestWithBody, TUserAuth } from './types';
-import { comparePassword, hashPassword, validateEmail } from '../../utils';
+import { comparePassword, hashPassword, validateEmail, validatePassword } from '../../utils';
 import { TUser } from '../users';
+import { OkPacket } from 'mysql2';
 const jwt = require('jsonwebtoken');
 const secretKey = "PEPE_PICA_PAPAS_SECRET"
 
@@ -35,22 +36,24 @@ export const authenticationToken = async (req: IGetUserAuthInfoRequest, res: Res
 
   try {
     const decoded = jwt.verify(token, secretKey) as { id: number }; 
+    
     if (!decoded){
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const user = await findUserById(decoded.id)
+
     req.user = user
     next();
 
-  } catch (error) {
-    return res.status(401).json({ error: error });
+  } catch (error ) {
+    return res.status(401).json({ error: 'Unauthorized', message: "Token expired" });
   };
 }
 
 
-export const signIn  = async (req: Request<{},{},TUserAuth>, res: Response) => {
-  const {email, password} = req.body
+export const signIn = async (req: Request<{},{},TUserAuth>, res: Response) => {
+  const { email, password } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Missing required parameter' });
@@ -64,30 +67,39 @@ export const signIn  = async (req: Request<{},{},TUserAuth>, res: Response) => {
   //   return res.status(400).json({ message: 'The password does not meet the security criteria.' });
   // }
 
-  const email_exist = await findUserByEmail(email)
-  if (email_exist){
-    return res.status(409).json({ message: 'This email already in use' });
+  const emailExist = await findUserByEmail(email);
+  if (emailExist) {
+    return res.status(409).json({ message: 'This email is already in use' });
   }
 
-  const hashedPassword = await hashPassword(password);
+  try {
+    const hashedPassword = await hashPassword(password);
 
-  const [rows] = await pool.query(`INSERT INTO users (email, password) VALUES ('${email}', '${hashedPassword}');`) as any;
+    const [result] = await pool.query('INSERT INTO users (email, password) VALUES (?, ?)', [email, hashedPassword]) as OkPacket[];
 
-  
-  const {refreshToken, accessToken} = generateTokens(rows.insertId)
+    const userId = result.insertId;
+    const { refreshToken, accessToken } = generateTokens(userId);
 
-  await pool.query(`UPDATE users SET refreshToken = "${refreshToken}" WHERE id = ${rows.insertId};`);
-  const user_id = await findUserById(rows.insertId)
+    await pool.query('UPDATE users SET refreshToken = ? WHERE id = ?', [refreshToken, userId]);
 
-  return   res.status(200).json({
-    ...user_id,
-    accessToken
-  });
-}
+    const user = await findUserById(userId);
+
+    const {password: _, ...userWithoutPassword} = user as TUser;
+
+    return res.status(200).json({
+      ...userWithoutPassword,
+      accessToken
+    });
+  } catch (error) {
+    console.error('Error occurred during sign in:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
 
 
-export const login = async (req: Request<{},{},TUserAuth>, res: Response) => {
-  const {email, password} = req.body
+
+export const login = async (req: Request<{}, {}, TUserAuth>, res: Response) => {
+  const { email, password } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Missing required parameter' });
@@ -97,54 +109,67 @@ export const login = async (req: Request<{},{},TUserAuth>, res: Response) => {
     return res.status(422).json({ error: 'Invalid email address' });
   }
 
-  const user = await findUserByEmail(email)
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid email or password' });
+  try {
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const passwordMatch = await comparePassword(password, user.password);
+    if (!passwordMatch) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const { refreshToken, accessToken } = generateTokens(user.id);
+
+    await pool.query('UPDATE users SET refreshToken = ? WHERE id = ?', [refreshToken, user.id]);
+
+    const { password: _, ...userWithoutPassword } = user;
+
+    return res.status(200).json({
+      ...userWithoutPassword,
+      refreshToken,
+      accessToken
+    });
+  } catch (error) {
+    console.error('Error occurred during login:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
-
-  const passwordMatch = await comparePassword(password, user.password)
-  if (!passwordMatch) {
-    return res.status(401).json({ error: 'Invalid email or password' });
-  }
-
-  const {refreshToken, accessToken} = generateTokens(user.id)
-
-  await pool.query(`UPDATE users SET refreshToken = "${refreshToken}" WHERE id = ${user.id};`) as any;
-
-  return res.status(200).json({
-    ...user,
-    refreshToken,
-    accessToken
-  });
-}
-
-
-export const refreshToken = async (req: IGetUserAuthInfoRequest, res: Response) => {
-  const _refreshToken = req.headers['authorization']?.split(" ")[1];
-
-  if (!_refreshToken) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  if (_refreshToken !== req.user?.refreshToken){
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const decoded = jwt.verify(_refreshToken, secretKey) as { id: number }; 
-
-  const {accessToken, refreshToken} = generateTokens(decoded.id)
-
-  await pool.query(`UPDATE users SET refreshToken = "${refreshToken}" WHERE id = ${decoded.id};`) as any;
-
-  return res.status(200).json({
-    refreshToken,
-    accessToken
-  });
 };
 
 
+
+export const refreshToken = async (req: IGetUserAuthInfoRequest, res: Response) => {
+  const refreshToken = req.headers['authorization']?.split(" ")[1];
+
+  if (!refreshToken) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  if (refreshToken !== req.user?.refreshToken) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, secretKey) as { id: number };
+
+    const { accessToken, refreshToken: newRefreshToken } = generateTokens(decoded.id);
+
+    await pool.query('UPDATE users SET refreshToken = ? WHERE id = ?', [newRefreshToken, decoded.id]);
+
+    return res.status(200).json({
+      refreshToken: newRefreshToken,
+      accessToken
+    });
+  } catch (error) {
+    console.error('Error occurred during token refresh:', error);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+
+
 export const test = async (req: IGetUserAuthInfoRequestWithBody<{}>, res: Response) => {
-  console.log(req.user)
-  return res.status(401).json({ error: 'test paso perro' });
+  return res.status(401).json({ msg: 'test paso perro' });
 
 }
