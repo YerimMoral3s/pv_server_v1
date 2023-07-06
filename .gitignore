@@ -6,7 +6,7 @@ package-lock.json
 
 # Carpeta de compilación
 /dist/
-
+dist/
 # Archivos de log
 *.log
 
