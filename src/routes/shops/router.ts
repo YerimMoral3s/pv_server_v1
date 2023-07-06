@@ -5,7 +5,7 @@ import { authenticationToken } from '../auth';
 
 export const shopsRouter = express.Router();
 
-shopsRouter.post('/', authenticationToken, postUserShop);
+shopsRouter.post('/create', authenticationToken, postUserShop);
 shopsRouter.get('/:id', getUserShop);
 
 

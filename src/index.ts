@@ -1,5 +1,5 @@
 import express, {Express, Request, Response} from 'express';
-import { authRouter, usersRouter } from './routes';
+import { authRouter, shopsRouter } from './routes';
 
 
 const dotenv = require('dotenv');
@@ -17,9 +17,10 @@ app.get('/', (req: Request, res: Response) => {
 
 app.use(express.json())
 
-// app.use('/shops', authRouter);
-app.use('/user', usersRouter);
+
 app.use('/auth', authRouter);
+app.use("/shops", shopsRouter);
+
 
 app.listen(mainPort, () => {
   console.log(`⚡️[server]: Server is running at http://localhost:${mainPort}`);
