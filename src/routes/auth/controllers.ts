@@ -74,7 +74,7 @@ export const signIn = async (req: Request<{},{}>, res: Response) => {
 
   // check if email already exists
   const emailExist = await findUserByEmail(email);
-  if (emailExist) return returnError(res, 409)
+  if (emailExist) return returnError(res, 400)
 
   try {
     console.log("signIn.hashPassword...")

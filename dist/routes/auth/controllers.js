@@ -84,7 +84,7 @@ const signIn = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     // check if email already exists
     const emailExist = yield findUserByEmail(email);
     if (emailExist)
-        return (0, utils_1.returnError)(res, 409);
+        return (0, utils_1.returnError)(res, 400);
     try {
         console.log("signIn.hashPassword...");
         const hashedPassword = yield (0, utils_1.hashPassword)(password);
