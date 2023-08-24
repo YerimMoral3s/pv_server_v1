@@ -13,9 +13,8 @@ app.get('/', (req, res) => {
     res.send('HELLO WORLD');
 });
 app.use(express_1.default.json());
-// app.use('/shops', authRouter);
-app.use('/user', routes_1.usersRouter);
 app.use('/auth', routes_1.authRouter);
+app.use("/shops", routes_1.shopsRouter);
 app.listen(mainPort, () => {
     console.log(`⚡️[server]: Server is running at http://localhost:${mainPort}`);
 });

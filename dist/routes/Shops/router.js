@@ -6,5 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.shopsRouter = void 0;
 const express_1 = __importDefault(require("express"));
 const controllers_1 = require("./controllers");
+const auth_1 = require("../auth");
 exports.shopsRouter = express_1.default.Router();
+exports.shopsRouter.post('/create', auth_1.authenticationToken, controllers_1.postUserShop);
 exports.shopsRouter.get('/:id', controllers_1.getUserShop);
