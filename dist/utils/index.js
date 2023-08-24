@@ -12,12 +12,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.comparePassword = exports.validatePassword = exports.hashPassword = exports.validateEmail = void 0;
+exports.returnSuccess = exports.returnError = exports.comparePassword = exports.validatePassword = exports.hashPassword = exports.validateEmail = void 0;
 const bcrypt_1 = __importDefault(require("bcrypt"));
+const errors_1 = require("./errors");
 const validateEmail = (email) => {
-    // Expresión regular para validar un email
     const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
-    return emailRegex.test(email);
+    const isValidEmail = emailRegex.test(email);
+    console.log("validateEmail.isValidEmail: ", isValidEmail);
+    return isValidEmail;
 };
 exports.validateEmail = validateEmail;
 const saltRounds = 10;
@@ -28,27 +30,62 @@ const hashPassword = (password) => __awaiter(void 0, void 0, void 0, function* (
 });
 exports.hashPassword = hashPassword;
 const validatePassword = (password) => {
-    const MIN_LENGTH = 8; // Mínimo 8 caracteres
-    const HAS_UPPERCASE = /[A-Z]/; // Al menos una mayúscula
-    const HAS_LOWERCASE = /[a-z]/; // Al menos una minúscula
-    const HAS_NUMBER = /\d/; // Al menos un número
-    const HAS_SPECIAL_CHARACTERS = /[-!$%^&*()_+|~=`{}\[\]:";'<>?,.\/]/; // Al menos un carácter especial
-    // Verificar longitud
-    if (password.length < MIN_LENGTH) {
+    const MIN_LENGTH = 8; // char min 
+    const HAS_UPPERCASE = /[A-Z]/; // at least one uppercase
+    const HAS_LOWERCASE = /[a-z]/; // at least one lowercase
+    const HAS_NUMBER = /\d/; // at least one number
+    const HAS_SPECIAL_CHARACTERS = /[-!$%^&*()_+|~=`{}\[\]:";'<>?,.\/]/; // at least one special character
+    // verify length
+    console.log("validatePassword.MIN_LENGTH: ", password.length > MIN_LENGTH);
+    if (password.length < MIN_LENGTH)
         return false;
-    }
-    // Verificar mayúsculas, minúsculas, números y caracteres especiales
-    if (!HAS_UPPERCASE.test(password) ||
-        !HAS_LOWERCASE.test(password) ||
-        !HAS_NUMBER.test(password) ||
-        !HAS_SPECIAL_CHARACTERS.test(password)) {
+    // verify uppercase
+    console.log("validatePassword.HAS_UPPERCASE: ", HAS_UPPERCASE.test(password));
+    if (!HAS_UPPERCASE.test(password))
         return false;
-    }
+    // verify lowercase
+    console.log("validatePassword.HAS_LOWERCASE: ", HAS_LOWERCASE.test(password));
+    if (!HAS_LOWERCASE.test(password))
+        return false;
+    // verify number
+    console.log("validatePassword.HAS_NUMBER: ", HAS_NUMBER.test(password));
+    if (!HAS_NUMBER.test(password))
+        return false;
+    // verify special characters
+    console.log("validatePassword.HAS_SPECIAL_CHARACTERS: ", HAS_SPECIAL_CHARACTERS.test(password));
+    if (!HAS_SPECIAL_CHARACTERS.test(password))
+        return false;
     return true;
 };
 exports.validatePassword = validatePassword;
 const comparePassword = (password, hashedPassword) => __awaiter(void 0, void 0, void 0, function* () {
+    console.log("comparePassword.password: ");
     const match = yield bcrypt_1.default.compare(password, hashedPassword);
     return match;
 });
 exports.comparePassword = comparePassword;
+const returnError = (res, status, moreData) => {
+    const errorMessage = errors_1.ERROR_MESSAGES[status];
+    console.log("returnError.message: ", {
+        status,
+        message: errorMessage,
+        moreData,
+    });
+    return res.status(status).json({
+        status: "error",
+        data: Object.assign({ code: status, message: errorMessage }, moreData),
+    });
+};
+exports.returnError = returnError;
+const returnSuccess = (res, status, data) => {
+    console.log("returnSuccess.message: ", {
+        status,
+        data
+    });
+    const response = {
+        status: "success",
+        data
+    };
+    return res.status(status).json(response);
+};
+exports.returnSuccess = returnSuccess;

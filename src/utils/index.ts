@@ -1,9 +1,12 @@
 import bcrypt from 'bcrypt';
+import { Response } from 'express';
+import {  ERROR_MESSAGES, Terrors } from './errors';
 
 export const validateEmail = (email: string): boolean => {
-    // Expresión regular para validar un email
-    const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
-    return emailRegex.test(email);
+  const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+  const isValidEmail = emailRegex.test(email);
+  console.log("validateEmail.isValidEmail: ", isValidEmail)
+  return isValidEmail;
 }
 
 const saltRounds = 10;
@@ -14,31 +17,71 @@ export const hashPassword = async (password: string): Promise<string> => {
 };
 
 export const  validatePassword = (password: string): boolean  => {
-  const MIN_LENGTH = 8; // Mínimo 8 caracteres
-  const HAS_UPPERCASE = /[A-Z]/; // Al menos una mayúscula
-  const HAS_LOWERCASE = /[a-z]/; // Al menos una minúscula
-  const HAS_NUMBER = /\d/; // Al menos un número
-  const HAS_SPECIAL_CHARACTERS = /[-!$%^&*()_+|~=`{}\[\]:";'<>?,.\/]/; // Al menos un carácter especial
+  const MIN_LENGTH = 8; // char min 
+  const HAS_UPPERCASE = /[A-Z]/; // at least one uppercase
+  const HAS_LOWERCASE = /[a-z]/; // at least one lowercase
+  const HAS_NUMBER = /\d/; // at least one number
+  const HAS_SPECIAL_CHARACTERS = /[-!$%^&*()_+|~=`{}\[\]:";'<>?,.\/]/; // at least one special character
   
-  // Verificar longitud
-  if (password.length < MIN_LENGTH) {
-    return false;
-  }
+  // verify length
+  console.log("validatePassword.MIN_LENGTH: ", password.length > MIN_LENGTH)
+  if (password.length < MIN_LENGTH) return false;
 
-  // Verificar mayúsculas, minúsculas, números y caracteres especiales
-  if (
-    !HAS_UPPERCASE.test(password) ||
-    !HAS_LOWERCASE.test(password) ||
-    !HAS_NUMBER.test(password) ||
-    !HAS_SPECIAL_CHARACTERS.test(password)
-  ) {
-    return false;
-  }
+  // verify uppercase
+  console.log("validatePassword.HAS_UPPERCASE: ", HAS_UPPERCASE.test(password))
+  if (!HAS_UPPERCASE.test(password)) return false;
+
+  // verify lowercase
+  console.log("validatePassword.HAS_LOWERCASE: ", HAS_LOWERCASE.test(password))
+  if (!HAS_LOWERCASE.test(password)) return false;
+
+  // verify number
+  console.log("validatePassword.HAS_NUMBER: ", HAS_NUMBER.test(password))
+  if (!HAS_NUMBER.test(password)) return false;
+
+  // verify special characters
+  console.log("validatePassword.HAS_SPECIAL_CHARACTERS: ", HAS_SPECIAL_CHARACTERS.test(password))
+  if (!HAS_SPECIAL_CHARACTERS.test(password)) return false;
 
   return true;
 }
 
 export const comparePassword= async(password: string, hashedPassword: string): Promise<boolean> => { 
+  console.log("comparePassword.password: ")
   const match = await bcrypt.compare(password, hashedPassword);
   return match;
 }
+
+export const returnError = (res: Response, status: Terrors, moreData?: Record<string, any>) => {
+  const errorMessage = ERROR_MESSAGES[status];
+
+  console.log("returnError.message: ", {
+    status,
+    message: errorMessage,
+    moreData,
+  });
+
+  return res.status(status).json({
+    status: "error",
+    data: {
+      code: status,
+      message: errorMessage,
+      ...moreData,
+    },
+  });
+};
+
+
+export const returnSuccess = <T>(res: Response, status: number, data: T) => {
+  console.log("returnSuccess.message: ", {
+    status,
+    data
+  });
+
+  const response = {
+    status: "success",
+    data
+  };
+
+  return res.status(status).json(response);
+};

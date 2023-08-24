@@ -1,186 +1,179 @@
 import { Request, Response} from 'express';
 import { pool } from "../../db";
 import { IGetUserAuthInfoRequest, IGetUserAuthInfoRequestWithBody, TUserAuth } from './types';
-import { comparePassword, hashPassword, validateEmail, validatePassword } from '../../utils';
-import { TUser } from '../users';
+import { comparePassword, hashPassword, returnError, returnSuccess, validateEmail, validatePassword } from '../../utils';
+import { TUserCreate } from '../users';
 import { OkPacket } from 'mysql2';
 const jwt = require('jsonwebtoken');
 const secretKey = "PEPE_PICA_PAPAS_SECRET"
 
 const generateTokens = (id: number) =>{
-  const accessToken: string = jwt.sign({ id: id }, secretKey, { expiresIn: '1hr' });
-  const refreshToken: string = jwt.sign({ id: id }, secretKey, { expiresIn: '30d' });
-  return { accessToken, refreshToken };
+  console.log("generateTokens.id: ", id)
+  const access_token: string = jwt.sign({ id_user: id }, secretKey, { expiresIn: '1hr' });
+  const refresh_token: string = jwt.sign({ id_user: id }, secretKey, { expiresIn: '30d' });
+  return { access_token, refresh_token };
 }
 
 
 const findUserByEmail =async  (email: string) => {
+  console.log("findUserByEmail.email: ", email)
   const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-  const user = rows as TUser[]
+  const user = rows as TUserCreate[]
+  console.log("findUserByEmail.user: ", user.length > 0)
   return user.length > 0 ? user[0] : undefined
 }
 
 
 const findUserById =async  (id: number) => {
-  const [results] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
-  const user = results as TUser[]
+  console.log("findUserById.id: ", id)
+  const [results] = await pool.query('SELECT * FROM users WHERE id_user = ?', [id]);
+  const user = results as TUserCreate[]
+  console.log("findUserByEmail.exist: ",  user.length > 0)
   return user.length > 0 ? user[0] : undefined
 }
 
 
-export const authenticationToken = async (req: IGetUserAuthInfoRequest, res: Response, next: () => any) =>{
+export const authenticationToken = async (req: IGetUserAuthInfoRequest, res: Response, next: () => any) => {
   const token = req.headers['authorization']?.split(" ")[1];
-  if (!token) {
-    return res.status(401).json({ status: "error", message: 'Unauthorized' });
-  }
+
+  // validate token
+  if (!token) return returnError(res, 401)
 
   try {
-    const decoded = jwt.verify(token, secretKey) as { id: number }; 
-    
-    if (!decoded){
-      return res.status(401).json({ status: "error", message: 'Unauthorized' });
-    }
+    const decoded = jwt.verify(token, secretKey) as { id_user: number }; 
 
-    const user = await findUserById(decoded.id)
+    // validate decoded token
+    if (!decoded) return returnError(res, 401)
+    
+    // validate user exists
+    const user = await findUserById(decoded.id_user)
+
+    if (!user) return returnError(res, 401)
 
     req.user = user
     next();
 
   } catch (error ) {
-    return res.status(401).json({ error: 'Unauthorized', message: "Token expired" });
+    return returnError(res, 401)
   };
 }
 
 
-export const signIn = async (req: Request<{},{},TUserAuth>, res: Response) => {
+export const signIn = async (req: Request<{},{}>, res: Response) => {
+  console.log("signIn")
   const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ status: "error", message: 'Missing required parameter' });
-  }
+  // validate email and password fields
+  if (!email || !password) return returnError(res, 400)
 
-  if (!validateEmail(email)) {
-    return res.status(422).json({ status: "error", message: 'Invalid email address' });
-  }
+  // validate email format
+  if (!validateEmail(email)) return returnError(res, 422)
 
-  if (!validatePassword(password)) {
-    return res.status(400).json({ status: "error", message: 'The password does not meet the security criteria.' });
-  }
+  // validate password format
+  if (!validatePassword(password)) return returnError(res, 423)
 
+  // check if email already exists
   const emailExist = await findUserByEmail(email);
-  if (emailExist) {
-    return res.status(409).json({ status: "error", message: 'This email is already in use' });
-  }
+  if (emailExist) return returnError(res, 409)
 
   try {
+    console.log("signIn.hashPassword...")
     const hashedPassword = await hashPassword(password);
 
+    console.log("signIn.pool.creating.user...")
     const [result] = await pool.query('INSERT INTO users (email, password) VALUES (?, ?)', [email, hashedPassword]) as OkPacket[];
 
+    console.log("signIn.generateTokens...")
     const userId = result.insertId;
-    const { refreshToken, accessToken } = generateTokens(userId);
+    const tokens = generateTokens(userId);
 
-    await pool.query('UPDATE users SET refreshToken = ? WHERE id = ?', [refreshToken, userId]);
+    console.log("signIn.pool.query.refresh_token...")
+    await pool.query('UPDATE users SET refresh_token = ? WHERE id_user = ?', [tokens.refresh_token, userId]);
 
     const user = await findUserById(userId);
+    const {password: _, ...userWithoutPassword} = user as TUserCreate;
 
-    const {password: _, ...userWithoutPassword} = user as TUser;
-
-    return res.status(200).json({ 
-      status: "success", 
-      data: {
-        user: {
-          ...userWithoutPassword,
-          accessToken
-        }
+    return returnSuccess(res, 200, {
+      user: {
+        ...userWithoutPassword,
+        access_token: tokens.access_token,
       }
-    });
+    })
+
   } catch (error) {
     console.error('Error occurred during sign in:', error);
-    return res.status(500).json({ status: "error", message: 'Internal server error' });
-  }
-};
+    return  returnError(res, 500)
+  };
 
-
+}
 
 export const login = async (req: Request<{}, {}, TUserAuth>, res: Response) => {
   const { email, password } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ status: "error", message: 'Missing required parameter' });
-  }
-
-  if (!validateEmail(email)) {
-    return res.status(422).json({ status: "error", message: 'Invalid email address' });
-  }
+  // validate email and password fields
+  if (!email || !password) return returnError(res, 400)
 
   try {
+    console.log("login.findUserByEmail...")
     const user = await findUserByEmail(email);
-    if (!user) {
-      return res.status(401).json({ status: "error", message: 'Invalid email or password' });
-    }
+    
+    // validate user exists
+    if (!user) return returnError(res, 401)
 
+    // compare passwords
     const passwordMatch = await comparePassword(password, user.password);
-    if (!passwordMatch) {
-      return res.status(401).json({ status: "error", message: 'Invalid email or password' });
-    }
+    if (!passwordMatch) return returnError(res, 401)
 
-    const { refreshToken, accessToken } = generateTokens(user.id);
+    const tokens = generateTokens(user.id_user);
 
-    await pool.query('UPDATE users SET refreshToken = ? WHERE id = ?', [refreshToken, user.id]);
+    console.log("login.pool.query.refresh_token...")
+    await pool.query('UPDATE users SET refresh_token = ? WHERE id_user = ?', [tokens.refresh_token, user.id_user]);
 
     const { password: _, ...userWithoutPassword } = user;
 
-    return res.status(200).json({
-      status: "success",
-      data: {
-        user: {
-            ...userWithoutPassword,
-            refreshToken,
-            accessToken
-        }
+    return returnSuccess(res, 200, {
+      user: {
+        ...userWithoutPassword,
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
       }
-    });
+    })
+
+
   } catch (error) {
     console.error('Error occurred during login:', error);
-    return res.status(500).json({ status: "error", message: 'Internal server error' });
+    return returnError(res, 500 )
   }
 };
-
-
 
 export const refreshToken = async (req: IGetUserAuthInfoRequest, res: Response) => {
   const refreshToken = req.headers['authorization']?.split(" ")[1];
 
-  if (!refreshToken) {
-    return res.status(401).json({ status: "error", message: 'Unauthorized' });
-  }
-
-  if (refreshToken !== req.user?.refreshToken) {
-    return res.status(401).json({ status: "error", message: 'Unauthorized' });
-  }
+  // validate refresh token
+  if (!refreshToken) return returnError(res, 401)
+   
+  // validate refresh token coincides with user's refresh token
+  if (refreshToken !== req.user?.refresh_token) return returnError(res, 401)
 
   try {
-    const decoded = jwt.verify(refreshToken, secretKey) as { id: number };
+    // verify refresh token vs secret key
+    const decoded = jwt.verify(refreshToken, secretKey) as { id_user: number };
 
-    const { accessToken, refreshToken: newRefreshToken } = generateTokens(decoded.id);
+    // create new refresh token
+    const tokens = generateTokens(decoded.id_user);
 
-    await pool.query('UPDATE users SET refreshToken = ? WHERE id = ?', [newRefreshToken, decoded.id]);
+    // update user's refresh token
+    await pool.query('UPDATE users SET refresh_token = ? WHERE id_user = ?', [tokens.refresh_token, decoded.id_user]);
 
-    return res.status(200).json({ 
-      status: "success", 
-      data: {
-        refreshToken: newRefreshToken,
-        accessToken
-      }
-    });
+    return returnSuccess(res, 200, {
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+    })
   } catch (error) {
     console.error('Error occurred during token refresh:', error);
-    return res.status(500).json({ status: "error", message: 'Internal server error' });
+    return returnError(res, 500)
   }
 };
-
-
 
 export const test = async (req: IGetUserAuthInfoRequestWithBody<{}>, res: Response) => {
   return res.status(401).json({ msg: 'test paso perro' });

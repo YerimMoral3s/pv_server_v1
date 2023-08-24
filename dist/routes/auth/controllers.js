@@ -26,135 +26,141 @@ const utils_1 = require("../../utils");
 const jwt = require('jsonwebtoken');
 const secretKey = "PEPE_PICA_PAPAS_SECRET";
 const generateTokens = (id) => {
-    const accessToken = jwt.sign({ id: id }, secretKey, { expiresIn: '1hr' });
-    const refreshToken = jwt.sign({ id: id }, secretKey, { expiresIn: '30d' });
-    return { accessToken, refreshToken };
+    console.log("generateTokens.id: ", id);
+    const access_token = jwt.sign({ id_user: id }, secretKey, { expiresIn: '1hr' });
+    const refresh_token = jwt.sign({ id_user: id }, secretKey, { expiresIn: '30d' });
+    return { access_token, refresh_token };
 };
 const findUserByEmail = (email) => __awaiter(void 0, void 0, void 0, function* () {
+    console.log("findUserByEmail.email: ", email);
     const [rows] = yield db_1.pool.query('SELECT * FROM users WHERE email = ?', [email]);
     const user = rows;
+    console.log("findUserByEmail.user: ", user.length > 0);
     return user.length > 0 ? user[0] : undefined;
 });
 const findUserById = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    const [results] = yield db_1.pool.query('SELECT * FROM users WHERE id = ?', [id]);
+    console.log("findUserById.id: ", id);
+    const [results] = yield db_1.pool.query('SELECT * FROM users WHERE id_user = ?', [id]);
     const user = results;
+    console.log("findUserByEmail.exist: ", user.length > 0);
     return user.length > 0 ? user[0] : undefined;
 });
 const authenticationToken = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const token = (_a = req.headers['authorization']) === null || _a === void 0 ? void 0 : _a.split(" ")[1];
-    if (!token) {
-        return res.status(401).json({ status: "error", message: 'Unauthorized' });
-    }
+    // validate token
+    if (!token)
+        return (0, utils_1.returnError)(res, 401);
     try {
         const decoded = jwt.verify(token, secretKey);
-        if (!decoded) {
-            return res.status(401).json({ status: "error", message: 'Unauthorized' });
-        }
-        const user = yield findUserById(decoded.id);
+        // validate decoded token
+        if (!decoded)
+            return (0, utils_1.returnError)(res, 401);
+        // validate user exists
+        const user = yield findUserById(decoded.id_user);
+        if (!user)
+            return (0, utils_1.returnError)(res, 401);
         req.user = user;
         next();
     }
     catch (error) {
-        return res.status(401).json({ error: 'Unauthorized', message: "Token expired" });
+        return (0, utils_1.returnError)(res, 401);
     }
     ;
 });
 exports.authenticationToken = authenticationToken;
 const signIn = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    console.log("signIn");
     const { email, password } = req.body;
-    if (!email || !password) {
-        return res.status(400).json({ status: "error", message: 'Missing required parameter' });
-    }
-    if (!(0, utils_1.validateEmail)(email)) {
-        return res.status(422).json({ status: "error", message: 'Invalid email address' });
-    }
-    if (!(0, utils_1.validatePassword)(password)) {
-        return res.status(400).json({ status: "error", message: 'The password does not meet the security criteria.' });
-    }
+    // validate email and password fields
+    if (!email || !password)
+        return (0, utils_1.returnError)(res, 400);
+    // validate email format
+    if (!(0, utils_1.validateEmail)(email))
+        return (0, utils_1.returnError)(res, 422);
+    // validate password format
+    if (!(0, utils_1.validatePassword)(password))
+        return (0, utils_1.returnError)(res, 423);
+    // check if email already exists
     const emailExist = yield findUserByEmail(email);
-    if (emailExist) {
-        return res.status(409).json({ status: "error", message: 'This email is already in use' });
-    }
+    if (emailExist)
+        return (0, utils_1.returnError)(res, 409);
     try {
+        console.log("signIn.hashPassword...");
         const hashedPassword = yield (0, utils_1.hashPassword)(password);
+        console.log("signIn.pool.creating.user...");
         const [result] = yield db_1.pool.query('INSERT INTO users (email, password) VALUES (?, ?)', [email, hashedPassword]);
+        console.log("signIn.generateTokens...");
         const userId = result.insertId;
-        const { refreshToken, accessToken } = generateTokens(userId);
-        yield db_1.pool.query('UPDATE users SET refreshToken = ? WHERE id = ?', [refreshToken, userId]);
+        const tokens = generateTokens(userId);
+        console.log("signIn.pool.query.refresh_token...");
+        yield db_1.pool.query('UPDATE users SET refresh_token = ? WHERE id_user = ?', [tokens.refresh_token, userId]);
         const user = yield findUserById(userId);
         const _b = user, { password: _ } = _b, userWithoutPassword = __rest(_b, ["password"]);
-        return res.status(200).json({
-            status: "success",
-            data: {
-                user: Object.assign(Object.assign({}, userWithoutPassword), { accessToken })
-            }
+        return (0, utils_1.returnSuccess)(res, 200, {
+            user: Object.assign(Object.assign({}, userWithoutPassword), { access_token: tokens.access_token })
         });
     }
     catch (error) {
         console.error('Error occurred during sign in:', error);
-        return res.status(500).json({ status: "error", message: 'Internal server error' });
+        return (0, utils_1.returnError)(res, 500);
     }
+    ;
 });
 exports.signIn = signIn;
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password } = req.body;
-    if (!email || !password) {
-        return res.status(400).json({ status: "error", message: 'Missing required parameter' });
-    }
-    if (!(0, utils_1.validateEmail)(email)) {
-        return res.status(422).json({ status: "error", message: 'Invalid email address' });
-    }
+    // validate email and password fields
+    if (!email || !password)
+        return (0, utils_1.returnError)(res, 400);
     try {
+        console.log("login.findUserByEmail...");
         const user = yield findUserByEmail(email);
-        if (!user) {
-            return res.status(401).json({ status: "error", message: 'Invalid email or password' });
-        }
+        // validate user exists
+        if (!user)
+            return (0, utils_1.returnError)(res, 401);
+        // compare passwords
         const passwordMatch = yield (0, utils_1.comparePassword)(password, user.password);
-        if (!passwordMatch) {
-            return res.status(401).json({ status: "error", message: 'Invalid email or password' });
-        }
-        const { refreshToken, accessToken } = generateTokens(user.id);
-        yield db_1.pool.query('UPDATE users SET refreshToken = ? WHERE id = ?', [refreshToken, user.id]);
+        if (!passwordMatch)
+            return (0, utils_1.returnError)(res, 401);
+        const tokens = generateTokens(user.id_user);
+        console.log("login.pool.query.refresh_token...");
+        yield db_1.pool.query('UPDATE users SET refresh_token = ? WHERE id_user = ?', [tokens.refresh_token, user.id_user]);
         const { password: _ } = user, userWithoutPassword = __rest(user, ["password"]);
-        return res.status(200).json({
-            status: "success",
-            data: {
-                user: Object.assign(Object.assign({}, userWithoutPassword), { refreshToken,
-                    accessToken })
-            }
+        return (0, utils_1.returnSuccess)(res, 200, {
+            user: Object.assign(Object.assign({}, userWithoutPassword), { access_token: tokens.access_token, refresh_token: tokens.refresh_token })
         });
     }
     catch (error) {
         console.error('Error occurred during login:', error);
-        return res.status(500).json({ status: "error", message: 'Internal server error' });
+        return (0, utils_1.returnError)(res, 500);
     }
 });
 exports.login = login;
 const refreshToken = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _c, _d;
     const refreshToken = (_c = req.headers['authorization']) === null || _c === void 0 ? void 0 : _c.split(" ")[1];
-    if (!refreshToken) {
-        return res.status(401).json({ status: "error", message: 'Unauthorized' });
-    }
-    if (refreshToken !== ((_d = req.user) === null || _d === void 0 ? void 0 : _d.refreshToken)) {
-        return res.status(401).json({ status: "error", message: 'Unauthorized' });
-    }
+    // validate refresh token
+    if (!refreshToken)
+        return (0, utils_1.returnError)(res, 401);
+    // validate refresh token coincides with user's refresh token
+    if (refreshToken !== ((_d = req.user) === null || _d === void 0 ? void 0 : _d.refresh_token))
+        return (0, utils_1.returnError)(res, 401);
     try {
+        // verify refresh token vs secret key
         const decoded = jwt.verify(refreshToken, secretKey);
-        const { accessToken, refreshToken: newRefreshToken } = generateTokens(decoded.id);
-        yield db_1.pool.query('UPDATE users SET refreshToken = ? WHERE id = ?', [newRefreshToken, decoded.id]);
-        return res.status(200).json({
-            status: "success",
-            data: {
-                refreshToken: newRefreshToken,
-                accessToken
-            }
+        // create new refresh token
+        const tokens = generateTokens(decoded.id_user);
+        // update user's refresh token
+        yield db_1.pool.query('UPDATE users SET refresh_token = ? WHERE id_user = ?', [tokens.refresh_token, decoded.id_user]);
+        return (0, utils_1.returnSuccess)(res, 200, {
+            access_token: tokens.access_token,
+            refresh_token: tokens.refresh_token,
         });
     }
     catch (error) {
         console.error('Error occurred during token refresh:', error);
-        return res.status(500).json({ status: "error", message: 'Internal server error' });
+        return (0, utils_1.returnError)(res, 500);
     }
 });
 exports.refreshToken = refreshToken;

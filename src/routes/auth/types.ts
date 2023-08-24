@@ -1,5 +1,5 @@
 import { Request } from "express"
-import { TUser } from "../users"
+import { TUserCreate } from "../users"
 
 export type TUserAuth = {
   email: string,
@@ -8,10 +8,10 @@ export type TUserAuth = {
 
 
 export interface IGetUserAuthInfoRequest extends Request {
-  user?: TUser 
+  user?: TUserCreate 
 }
 
 export interface IGetUserAuthInfoRequestWithBody<z> extends Request {
-  user?: TUser 
+  user?: TUserCreate 
   body: z
 }

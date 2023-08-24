@@ -19,7 +19,7 @@ app.use(express.json())
 
 
 app.use('/auth', authRouter);
-app.use("/shops", shopsRouter);
+// app.use("/shops", shopsRouter);
 
 
 app.listen(mainPort, () => {

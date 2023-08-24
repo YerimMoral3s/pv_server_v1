@@ -14,7 +14,7 @@ app.get('/', (req, res) => {
 });
 app.use(express_1.default.json());
 app.use('/auth', routes_1.authRouter);
-app.use("/shops", routes_1.shopsRouter);
+// app.use("/shops", shopsRouter);
 app.listen(mainPort, () => {
     console.log(`⚡️[server]: Server is running at http://localhost:${mainPort}`);
 });

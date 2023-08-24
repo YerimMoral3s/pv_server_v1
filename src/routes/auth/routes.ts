@@ -3,7 +3,7 @@ import { authenticationToken, login, refreshToken, signIn, test  } from "./contr
 
 export const authRouter = express.Router();
 
-authRouter.get('/test', authenticationToken ,test);
+authRouter.get('/test', authenticationToken, test);
 authRouter.get('/refresh-token', authenticationToken, refreshToken);
 authRouter.get('/', login );
 authRouter.post('/', signIn );
